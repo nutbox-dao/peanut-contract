@@ -142,7 +142,6 @@ contract PeanutsPool is Ownable {
 
     // calculate reward between blocks [from, to]
     function _calculateReward(uint256 from, uint256 to) internal view returns (uint256) {
-
         uint256 rewardPeanuts = 0;
         uint256 BASE_20  = 20 * 1e6;
         uint256 BASE_10  = 10 * 1e6;
@@ -151,7 +150,6 @@ contract PeanutsPool is Ownable {
         uint256 BASE_1  = 125 * 1e4;
 
         require(from <= to);
-
         if (to <= (genesisBlock + 1000000)) {
             rewardPeanuts = to.sub(from).add(1).mul(BASE_20);
         } else if (from > (genesisBlock + 1000000) && to <= (genesisBlock + 10000000)) {
@@ -283,6 +281,10 @@ contract PeanutsPool is Ownable {
             }
         }
         return (false, address(0));
+    }
+
+    function getDelegatorListLength() public view returns(uint256){
+        return delegatorList.length;
     }
 
     function getMinter() public view returns (address) {
