@@ -15,18 +15,18 @@ contract PeanutsPool is Ownable {
     struct Delegator {
         uint256 amount;             // reserved VEST
         uint256 availablePeanuts;   // minted peanuts for user
+        uint256 debtRewards;        // rewards debt 
         bool hasDeposited;          // set true when first time deposit
         string steemAccount;        // related steem acount
     }
 
-    mapping (address => uint256) private _balances;
-    mapping (address => mapping (address => uint256)) private _allowances;
     mapping(address => Delegator) public delegators;
     address[] public delegatorList;
 
     PnutsMining Pnuts;
     address public minter;
     uint256 public lastRewardBlock;
+    uint256 public shareAcc;
     uint256 public totalDepositedSP;
     uint256 public genesisBlock;
     address public devAddress;
@@ -49,6 +49,7 @@ contract PeanutsPool is Ownable {
         Pnuts = PnutsMining(_punts);
         totalDepositedSP = 0;
         lastRewardBlock = 0;
+        shareAcc = 0;
         genesisBlock = block.number;
         devAddress = msg.sender;
     }
@@ -72,13 +73,23 @@ contract PeanutsPool is Ownable {
             delegators[delegator].availablePeanuts = 0;
             delegators[delegator].steemAccount = steemAccount;
             delegators[delegator].amount = 0;
+            delegators[delegator].debtRewards = 0;
             delegatorList.push(delegator);
         }
 
         _updateRewardInfo();
 
+        if (delegators[delegator].amount > 0) {
+            uint256 pending = delegators[delegator].amount.mul(shareAcc).sub(delegators[delegator].debtRewards);
+            if(pending > 0) {
+                delegators[delegator].availablePeanuts = delegators[delegator].availablePeanuts.add(pending);
+            }
+        }
+
         delegators[delegator].amount = delegators[delegator].amount.add(_amount);
         totalDepositedSP = totalDepositedSP.add(_amount);
+
+        delegators[delegator].debtRewards = delegators[delegator].amount.mul(shareAcc);
 
         emit Deposit(steemAccount, delegator, _amount);
     }
@@ -88,21 +99,27 @@ contract PeanutsPool is Ownable {
         public
         onlyMinter
     {
-        uint256 withdrawAmount;
-
         if (_amount == 0) return;
 
         if (delegators[delegator].amount == 0) return;
 
+        _updateRewardInfo();
+
+        uint256 pending = delegators[delegator].amount.mul(shareAcc).sub(delegators[delegator].debtRewards);
+        if(pending > 0) {
+            delegators[delegator].availablePeanuts = delegators[delegator].availablePeanuts.add(pending);
+        }
+        
+        uint256 withdrawAmount;
         if (_amount >= delegators[delegator].amount)
             withdrawAmount = delegators[delegator].amount;
         else
             withdrawAmount = _amount;
 
-        _updateRewardInfo();
-        
         delegators[delegator].amount = delegators[delegator].amount.sub(withdrawAmount);
         totalDepositedSP = totalDepositedSP.sub(withdrawAmount);
+
+        delegators[delegator].debtRewards = delegators[delegator].amount.mul(shareAcc);
 
         emit Withdraw(delegators[delegator].steemAccount, delegator, withdrawAmount);
     }
@@ -131,6 +148,11 @@ contract PeanutsPool is Ownable {
         // There are new blocks created after last updating, so append new rewards before withdraw
         if(block.number > lastRewardBlock) {
             _updateRewardInfo();
+        }
+
+        uint256 pending = delegators[msg.sender].amount.mul(shareAcc).sub(delegators[msg.sender].debtRewards);
+        if(pending > 0) {
+            delegators[msg.sender].availablePeanuts = delegators[msg.sender].availablePeanuts.add(pending);
         }
 
         Pnuts.transfer(msg.sender, delegators[msg.sender].availablePeanuts);
@@ -198,13 +220,7 @@ contract PeanutsPool is Ownable {
         Pnuts.mint(devAddress, peanutsReadyToMinted.div(10));
         Pnuts.mint(address(this), peanutsReadyToMinted);
 
-        // update availablePeanuts for every delegator
-        for (uint i = 0; i < delegatorList.length; i++) {
-            if (delegators[delegatorList[i]].amount == 0) continue;
-
-            delegators[delegatorList[i]].availablePeanuts = delegators[delegatorList[i]].availablePeanuts
-            .add(peanutsReadyToMinted.mul(delegators[delegatorList[i]].amount).div(totalDepositedSP));
-        }
+        shareAcc = shareAcc.add(peanutsReadyToMinted.div(totalDepositedSP));
 
         lastRewardBlock = block.number;
     }
@@ -219,9 +235,11 @@ contract PeanutsPool is Ownable {
         // our lastRewardBlock isn't up to date, as the result, the availablePeanuts isn't
         // the right amount that delegator can award
         if (currentBlock > lastRewardBlock) {
+            uint256 _shareAcc = shareAcc;
             uint256 unmintedPeanuts = _calculateReward(lastRewardBlock + 1, currentBlock);
-            return delegators[msg.sender].availablePeanuts.add(
-                   unmintedPeanuts.mul(delegators[msg.sender].amount).div(totalDepositedSP));
+            _shareAcc = _shareAcc.add(unmintedPeanuts.div(totalDepositedSP));
+            uint256 pending = delegators[msg.sender].amount.mul(_shareAcc).sub(delegators[msg.sender].debtRewards);
+            return delegators[msg.sender].availablePeanuts.add(pending);
         } else {
             return delegators[msg.sender].availablePeanuts;
         }
