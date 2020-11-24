@@ -164,7 +164,6 @@ contract PeanutsPool is Ownable {
 
     // calculate reward between blocks [from, to]
     function _calculateReward(uint256 from, uint256 to) internal view returns (uint256) {
-        uint256 rewardPeanuts = 0;
         uint256 BASE_20  = 20 * 1e6;
         uint256 BASE_10  = 10 * 1e6;
         uint256 BASE_5  = 5 * 1e6;
@@ -173,31 +172,26 @@ contract PeanutsPool is Ownable {
 
         require(from <= to);
         if (to <= (genesisBlock + 1000000)) {
-            rewardPeanuts = to.sub(from).add(1).mul(BASE_20);
+            return to.sub(from).add(1).mul(BASE_20);
         } else if (from > (genesisBlock + 1000000) && to <= (genesisBlock + 10000000)) {
-            rewardPeanuts = to.sub(from).add(1).mul(BASE_10);
+            return to.sub(from).add(1).mul(BASE_10);
         } else if (from > (genesisBlock + 10000000) && to <= (genesisBlock + 20000000)) {
-            rewardPeanuts = to.sub(from).add(1).mul(BASE_5);
+            return to.sub(from).add(1).mul(BASE_5);
         } else if (from > (genesisBlock + 20000000) && to <= (genesisBlock + 30000000)) {
-            rewardPeanuts = to.sub(from).add(1).mul(BASE_2);
+            return to.sub(from).add(1).mul(BASE_2);
         } else if(from > (genesisBlock + 30000000)) {
-            rewardPeanuts = to.sub(from).add(1).mul(BASE_1);
+            return to.sub(from).add(1).mul(BASE_1);
         } else {    // reward maybe different under those blocks, so calculate it one by one
-            for(uint _block = from; _block <= to; _block++) {
-                if (_block <= genesisBlock + 1000000) {
-                    rewardPeanuts = rewardPeanuts.add(BASE_20);
-                } else if (_block > (genesisBlock + 1000000) && _block <= (genesisBlock + 10000000)){
-                    rewardPeanuts = rewardPeanuts.add(BASE_10);
-                } else if (_block > (genesisBlock + 10000000) && _block <= (genesisBlock + 20000000)){
-                    rewardPeanuts = rewardPeanuts.add(BASE_5);
-                } else if (_block > (genesisBlock + 20000000) && _block <= (genesisBlock + 30000000)){
-                    rewardPeanuts = rewardPeanuts.add(BASE_2);
-                } else {
-                    rewardPeanuts = rewardPeanuts.add(BASE_1);
-                }
+            if (from <= (genesisBlock + 1000000) && to >= (genesisBlock + 1000000)) {
+                return BASE_20.mul((genesisBlock + 1000000).sub(from).add(1)).add(BASE_10.mul(to.sub((genesisBlock + 1000000))));
+            } else if (from <= (genesisBlock + 10000000) && to >= (genesisBlock + 10000000)) {
+                return BASE_10.mul((genesisBlock + 10000000).sub(from).add(1)).add(BASE_5.mul(to.sub((genesisBlock + 10000000))));
+            } else if (from <= (genesisBlock + 20000000) && to >= (genesisBlock + 20000000)) {
+                return BASE_5.mul((genesisBlock + 20000000).sub(from).add(1)).add(BASE_2.mul(to.sub((genesisBlock + 20000000))));
+            } else {
+                return BASE_2.mul((genesisBlock + 30000000).sub(from).add(1)).add(BASE_1.mul(to.sub((genesisBlock + 30000000))));
             }
         }
-        return rewardPeanuts;
     }
 
     function _updateRewardInfo() internal
