@@ -84,7 +84,7 @@ contract PeanutsPool is Ownable {
         _updateRewardInfo();
 
         if (delegators[delegator].amount > 0) {
-            uint256 pending = delegators[delegator].amount.mul(shareAcc).sub(delegators[delegator].debtRewards);
+            uint256 pending = delegators[delegator].amount.mul(shareAcc).div(1e12).sub(delegators[delegator].debtRewards);
             if(pending > 0) {
                 delegators[delegator].availablePeanuts = delegators[delegator].availablePeanuts.add(pending);
             }
@@ -93,7 +93,7 @@ contract PeanutsPool is Ownable {
         delegators[delegator].amount = delegators[delegator].amount.add(_amount);
         totalDepositedSP = totalDepositedSP.add(_amount);
 
-        delegators[delegator].debtRewards = delegators[delegator].amount.mul(shareAcc);
+        delegators[delegator].debtRewards = delegators[delegator].amount.mul(shareAcc).div(1e12);
 
         emit Deposit(steemAccount, delegator, _amount);
     }
@@ -111,7 +111,7 @@ contract PeanutsPool is Ownable {
 
         _updateRewardInfo();
 
-        uint256 pending = delegators[delegator].amount.mul(shareAcc).sub(delegators[delegator].debtRewards);
+        uint256 pending = delegators[delegator].amount.mul(shareAcc).div(1e12).sub(delegators[delegator].debtRewards);
         if(pending > 0) {
             delegators[delegator].availablePeanuts = delegators[delegator].availablePeanuts.add(pending);
         }
@@ -125,7 +125,7 @@ contract PeanutsPool is Ownable {
         delegators[delegator].amount = delegators[delegator].amount.sub(withdrawAmount);
         totalDepositedSP = totalDepositedSP.sub(withdrawAmount);
 
-        delegators[delegator].debtRewards = delegators[delegator].amount.mul(shareAcc);
+        delegators[delegator].debtRewards = delegators[delegator].amount.mul(shareAcc).div(1e12);
 
         emit Withdraw(delegators[delegator].steemAccount, delegator, withdrawAmount);
     }
@@ -160,7 +160,7 @@ contract PeanutsPool is Ownable {
             _updateRewardInfo();
         }
 
-        uint256 pending = delegators[msg.sender].amount.mul(shareAcc).sub(delegators[msg.sender].debtRewards);
+        uint256 pending = delegators[msg.sender].amount.mul(shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
         if(pending > 0) {
             delegators[msg.sender].availablePeanuts = delegators[msg.sender].availablePeanuts.add(pending);
         }
@@ -224,7 +224,7 @@ contract PeanutsPool is Ownable {
         Pnuts.mint(devAddress, peanutsReadyToMinted.div(10));
         Pnuts.mint(address(this), peanutsReadyToMinted);
 
-        shareAcc = shareAcc.add(peanutsReadyToMinted.div(totalDepositedSP));
+        shareAcc = shareAcc.add(peanutsReadyToMinted.mul(1e12).div(totalDepositedSP));
 
         lastRewardBlock = block.number;
     }
@@ -241,8 +241,8 @@ contract PeanutsPool is Ownable {
         if (currentBlock > lastRewardBlock) {
             uint256 _shareAcc = shareAcc;
             uint256 unmintedPeanuts = _calculateReward(lastRewardBlock + 1, currentBlock);
-            _shareAcc = _shareAcc.add(unmintedPeanuts.div(totalDepositedSP));
-            uint256 pending = delegators[msg.sender].amount.mul(_shareAcc).sub(delegators[msg.sender].debtRewards);
+            _shareAcc = _shareAcc.add(unmintedPeanuts.mul(1e12).div(totalDepositedSP));
+            uint256 pending = delegators[msg.sender].amount.mul(_shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
             return delegators[msg.sender].availablePeanuts.add(pending);
         } else {
             return delegators[msg.sender].availablePeanuts;
