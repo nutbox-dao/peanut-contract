@@ -167,6 +167,8 @@ contract PeanutsPool is Ownable {
 
         Pnuts.transfer(msg.sender, delegators[msg.sender].availablePeanuts);
 
+        delegators[msg.sender].debtRewards = delegators[msg.sender].amount.mul(shareAcc).div(1e12);
+
         emit WithdrawPeanuts(delegators[msg.sender].steemAccount, msg.sender, delegators[msg.sender].availablePeanuts);
 
         delegators[msg.sender].availablePeanuts = 0;
@@ -338,7 +340,8 @@ contract PeanutsPool is Ownable {
         delegators[delegator].steemAccount = steemAccount;
         delegators[delegator].amount = _amount;
         delegators[delegator].debtRewards = 0;
-        delegators[delegator].availablePeanuts = _endowedAmount;
+        delegators[delegator].availablePeanuts = 0;
+        Pnuts.mint(delegator, _endowedAmount);
         delegatorList.push(delegator);
 
         totalDepositedSP = totalDepositedSP.add(_amount);
