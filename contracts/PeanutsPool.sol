@@ -30,6 +30,7 @@ contract PeanutsPool is Ownable {
     uint256 public totalDepositedSP;
     uint256 public genesisBlock;
     address public devAddress;
+    bool    public initialized;
     
     event Deposit(string steemAccount, address delegator, uint256 amount);
     event Withdraw(string steemAccount, address delegator, uint256 amount);
@@ -52,6 +53,7 @@ contract PeanutsPool is Ownable {
         shareAcc = 0;
         genesisBlock = block.number;
         devAddress = msg.sender;
+        initialized = false;
     }
 
     // Only minter can call this method
@@ -59,6 +61,8 @@ contract PeanutsPool is Ownable {
         public
         onlyMinter
     {
+        require(initialized == true, "Contract has not been initialized");
+
         if (_amount == 0) return;
 
         // lastRewardBlock == 0 means there is not delegator exist. When first delegator come,
@@ -99,6 +103,8 @@ contract PeanutsPool is Ownable {
         public
         onlyMinter
     {
+        require(initialized == true, "Contract has not been initialized");
+
         if (_amount == 0) return;
 
         if (delegators[delegator].amount == 0) return;
@@ -128,6 +134,8 @@ contract PeanutsPool is Ownable {
         public
         onlyMinter
     {
+        require(initialized == true, "Contract has not been initialized");
+
         uint256 prevAmount = delegators[delegator].amount;
 
         if (prevAmount < _amount) { // deposit
@@ -142,6 +150,8 @@ contract PeanutsPool is Ownable {
         public
         onlyDelegator
     {
+        require(initialized == true, "Contract has not been initialized");
+
         // game has not started
         if (lastRewardBlock == 0) return;
 
@@ -317,5 +327,27 @@ contract PeanutsPool is Ownable {
     {
         require(dev != address(0), "Invalid dev address");
         devAddress = dev;
+    }
+
+    function setEndowed(string memory steemAccount, address delegator, uint256 _amount, uint256 _endowedAmount) 
+    public 
+    onlyOwner 
+    {
+        require(initialized == false, "Contract already initialized");
+        delegators[delegator].hasDeposited = true;
+        delegators[delegator].steemAccount = steemAccount;
+        delegators[delegator].amount = _amount;
+        delegators[delegator].debtRewards = 0;
+        delegators[delegator].availablePeanuts = _endowedAmount;
+        delegatorList.push(delegator);
+
+        totalDepositedSP = totalDepositedSP.add(_amount);
+    }
+
+    function setInitialized() 
+    public 
+    onlyOwner {
+        require(initialized == false, "Contract already initialized");
+        initialized = true;
     }
 }
