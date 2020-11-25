@@ -261,7 +261,7 @@ contract PeanutsPool is Ownable {
         // the right amount that delegator can award
         if (currentBlock > lastRewardBlock) {
             uint256 unmintedPeanuts = _calculateReward(lastRewardBlock + 1, currentBlock);
-            return totalSupply.add(unmintedPeanuts);
+            return totalSupply.add(unmintedPeanuts).add(unmintedPeanuts.div(10));
         } else {
             return totalSupply;
         }
