@@ -37,7 +37,7 @@ contract TspPooling is Ownable {
     event Withdraw(address depositor, uint256 amount);
     event WithdrawPeanuts(address depositor, uint256 amount);
 
-    modifier onlyDepositors() {
+    modifier onlyDepositor() {
         require(depositors[msg.sender].hasDeposited, "Account is not a depositor");
         _;
     }
@@ -54,7 +54,7 @@ contract TspPooling is Ownable {
     {
         if (_amount == 0) return;
         uint256 tspBalance = Tsp.balanceOf(msg.sender)
-        require(_amount >= tspBalance, "ERC20: transfer amount exceeds balance");
+        require(_amount <= tspBalance, "ERC20: transfer amount exceeds balance");
 
         // tansfer tsp from sender to minter
         Tsp.transferFrom(msg.sender, this, _amount);
@@ -88,7 +88,7 @@ contract TspPooling is Ownable {
     // Only minter can call this method
     function withdraw(uint256 _amount) 
         public
-        onlyDepositors
+        onlyDepositor
     {
         if (_amount == 0) return;
 
@@ -105,7 +105,7 @@ contract TspPooling is Ownable {
         else
             withdrawAmount = _amount;
 
-        depositors[msg.sender].amount = depositors[msg.sender].sub(withdrawAmount);
+        depositors[msg.sender].amount = depositors[msg.sender].amount.sub(withdrawAmount);
         // transfer tsp from this to depositor
         TSP.transferFrom(this, msg.sender, withdrawAmount);
 
