@@ -9,6 +9,8 @@ interface PnutsMining  {
 
 interface PnutPooling {
     uint256 public shareAcc;
+    uint256 public lastRewardBlock;
+    uint256 public totalDepositedSP;
 }
 
 interface TspMining {
@@ -59,7 +61,7 @@ contract TspPooling is Ownable {
         // tansfer tsp from sender to minter
         Tsp.transferFrom(msg.sender, this, _amount);
 
-        uint256 shareAcc = pnutPool.shareAcc;
+        uint256 shareAcc = _getShareAcc();
 
         // Add to delegator list if account hasn't deposited before
         if(!depositors[msg.sender].hasDeposited) {
@@ -93,7 +95,7 @@ contract TspPooling is Ownable {
         if (_amount == 0) return;
 
         if (delegators[delegator].amount == 0) return;
-        uint256 shareAcc = pnutPool.shareAcc;
+        uint256 shareAcc = _getShareAcc();
         uint256 pending = depositors[msg.sender].mul(shareAcc).div(1e12).sub(depositors[msg.sender].debtRewards);
         if(pending > 0) {
             depositors[msg.sender].availablePeanuts = depositors[msg.sender].availablePeanuts.add(pending);
@@ -118,7 +120,7 @@ contract TspPooling is Ownable {
         public
         onlyDepositor
     {
-        uint256 shareAcc = pnutPool.shareAcc;
+        uint256 shareAcc = _getShareAcc();
         uint256 pending = depositors[msg.sender].amount.mul(shareAcc).div(1e12).sub(depositors[msg.sender].debtRewards);
         if(pending > 0) {
             depositors[msg.sender].availablePeanuts = depositors[msg.sender].availablePeanuts.add(pending);
@@ -135,12 +137,52 @@ contract TspPooling is Ownable {
     
     // pending peanuts >= delegator.availablePeanuts
     function getPendingPeanuts() public view returns (uint256) {
-        uint256 _shareAcc = pnutPool.shareAcc;
+        uint256 shareAcc = _getShareAcc();
         uint256 pending = depositors[msg.sender].amount.mul(shareAcc).div(1e12).sub(depositors[msg.sender].debtRewards);
         return depositors[msg.sender].availablePeanuts.add(pending);
     }
 
     function getDepositorListLength() public view returns(uint256){
         return depositorsList.length;
+    }
+
+    function _getShareAcc() internal view returns (uint256) {
+        uint256 from = PnutPool.lastRewardBlock;
+        uint256 shareAcc = PnutPool.shareAcc;
+        uint256 totalDepositedSP = PnutPool.totalDepositedSP;
+        uint256 to = block.number;
+
+        require(from <= to);
+
+        uint256 BASE_20  = 20 * 1e6;
+        uint256 BASE_10  = 10 * 1e6;
+        uint256 BASE_5  = 5 * 1e6;
+        uint256 BASE_2  = 25 * 1e5;
+        uint256 BASE_1  = 125 * 1e4;
+
+        uint256 peanutsReadyToMinted = 0;
+
+        if (to <= (genesisBlock + 1000000)) {
+            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_20);
+        } else if (from > (genesisBlock + 1000000) && to <= (genesisBlock + 10000000)) {
+            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_10);
+        } else if (from > (genesisBlock + 10000000) && to <= (genesisBlock + 20000000)) {
+            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_5);
+        } else if (from > (genesisBlock + 20000000) && to <= (genesisBlock + 30000000)) {
+            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_2);
+        } else if(from > (genesisBlock + 30000000)) {
+            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_1);
+        } else {    // reward maybe different under those blocks, so calculate it one by one
+            if (from <= (genesisBlock + 1000000) && to >= (genesisBlock + 1000000)) {
+                peanutsReadyToMinted = BASE_20.mul((genesisBlock + 1000000).sub(from).add(1)).add(BASE_10.mul(to.sub((genesisBlock + 1000000))));
+            } else if (from <= (genesisBlock + 10000000) && to >= (genesisBlock + 10000000)) {
+                peanutsReadyToMinted = BASE_10.mul((genesisBlock + 10000000).sub(from).add(1)).add(BASE_5.mul(to.sub((genesisBlock + 10000000))));
+            } else if (from <= (genesisBlock + 20000000) && to >= (genesisBlock + 20000000)) {
+                peanutsReadyToMinted = BASE_5.mul((genesisBlock + 20000000).sub(from).add(1)).add(BASE_2.mul(to.sub((genesisBlock + 20000000))));
+            } else {
+                peanutsReadyToMinted = BASE_2.mul((genesisBlock + 30000000).sub(from).add(1)).add(BASE_1.mul(to.sub((genesisBlock + 30000000))));
+            }
+        }
+        return shareAcc.add(peanutsReadyToMinted.mul(1e12).div(totalDepositedSP));
     }
 }
