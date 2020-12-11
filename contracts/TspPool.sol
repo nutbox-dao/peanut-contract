@@ -3,186 +3,218 @@ pragma solidity ^0.5.0;
 import "./SafeMath.sol";
 import "./Ownable.sol";
 
-interface PnutsMining  {
-    function transfer(address _to, uint256 _value) external returns (bool success);
-}
-
-interface PnutPooling {
-    uint256 public shareAcc;
-    uint256 public lastRewardBlock;
-    uint256 public totalDepositedSP;
-}
-
-interface TspMining {
+interface ERC20Token {
+    function transfer(address _to, uint256 _value) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
+}
+
+interface PeanutsPool {
+    function withdrawPeanuts() external;
+    function getPendingPeanuts() external view returns (uint256);
 }
 
 contract TspPooling is Ownable {
     using SafeMath for uint256;
 
-    struct Depositor {
-        uint256 amount;             // deposted tsp
+    struct Delegator {
+        uint256 tspAmount;          // deposted tsp
+        uint256 lptokenAmount;      // deposted tsp
         uint256 availablePeanuts;   // minted peanuts for user
         uint256 debtRewards;        // rewards debt 
         bool hasDeposited;          // set true when first time deposit
     }
 
-    mapping(address => Depositor) public depositors;
-    address[] public depositorsList;
+    mapping(address => Delegator) public delegators;
+    address[] public delegatorsList;
+    uint256 public shareAcc;
+    uint256 public totalDepositedTSP;
+    address public pairAddress;
+    uint256 public lastRewardBlock;
 
-    PnutsMining Pnuts;
-    TspMining Tsp;
-    PnutPooling PnutPool;
-    
-    event Deposit(address depositor, uint256 amount);
-    event Withdraw(address depositor, uint256 amount);
-    event WithdrawPeanuts(address depositor, uint256 amount);
+    ERC20Token Pnuts;
+    ERC20Token Tsp;
+    PeanutsPool PnutPool;
 
-    modifier onlyDepositor() {
-        require(depositors[msg.sender].hasDeposited, "Account is not a depositor");
+    event DepositTSP(address delegator, uint256 amount);
+    event WithdrawTSP(address delegator, uint256 amount);
+    event WithdrawPeanuts(address delegator, uint256 amount);
+
+    modifier onlyDelegator() {
+        require(delegators[msg.sender].hasDeposited, "Account is not a delegator");
         _;
     }
 
     constructor (address _punts, address _pnutPool, address _tsp) public {
-        Pnuts = PnutsMining(_punts);
-        PnutPool = PnutPooling(_pnutPool);
-        Tsp = TspMining(_tsp);
+        Pnuts = PnutsToken(_punts);
+        Tsp = NutboxTsp(_tsp);
+        PnutPool = PeanutsPool(_pnutPool);
+
+        shareAcc = 0;
+        totalDepositedTSP = 0;
+        lastRewardBlock = 0;
     }
 
-    // Only minter can call this method
     function deposit(uint256 _amount)
         public
     {
         if (_amount == 0) return;
-        uint256 tspBalance = Tsp.balanceOf(msg.sender)
-        require(_amount <= tspBalance, "ERC20: transfer amount exceeds balance");
 
-        // tansfer tsp from sender to minter
-        Tsp.transferFrom(msg.sender, this, _amount);
-
-        uint256 shareAcc = _getShareAcc();
-
-        // Add to delegator list if account hasn't deposited before
-        if(!depositors[msg.sender].hasDeposited) {
-            depositors[msg.sender].hasDeposited = true;
-            depositors[msg.sender].availablePeanuts = 0;
-            depositors[msg.sender].amount = _amount;
-            depositors[msg.sender].debtRewards = shareAcc.mul(_amount).div(1e12);
-            depositorsList.push(depositors);
-            return;
+        // lastRewardBlock == 0 means there is not delegator exist. When first delegator come,
+        // we set lastRewardBlock as current block number, then our game starts!
+        if (lastRewardBlock == 0) {
+            lastRewardBlock = block.number;
         }
 
-        if (depositors[msg.sender].amount > 0) {
-            uint256 pending = depositors[msg.sender].amount.mul(shareAcc).div(1e12).sub(depositors[msg.sender].debtRewards);
+        uint256 tspBalance = Tsp.balanceOf(msg.sender);
+        require(_amount <= tspBalance, "ERC20: transfer amount exceeds balance");
+
+        Tsp.transferFrom(msg.sender, address(this), _amount);
+
+        // Add to delegator list if account hasn't deposited before
+        if(!delegators[msg.sender].hasDeposited) {
+            delegators[msg.sender].hasDeposited = true;
+            delegators[msg.sender].availablePeanuts = 0;
+            delegators[msg.sender].tspAmount = 0;
+            delegators[msg.sender].debtRewards = 0;
+            delegatorsList.push(msg.sender);
+        }
+
+        _updateRewardInfo();
+
+        if (delegators[msg.sender].tspAmount > 0) {
+            uint256 pending = delegators[msg.sender].tspAmount.mul(shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
             if(pending > 0) {
-                depositors[msg.sender].availablePeanuts = depositors[msg.sender].availablePeanuts.add(pending);
+                delegators[msg.sender].availablePeanuts = delegators[msg.sender].availablePeanuts.add(pending);
             }
         }
 
-        depositors[msg.sender].amount = depositors[msg.sender].amount.add(_amount);
+        delegators[msg.sender].tspAmount = delegators[msg.sender].tspAmount.add(_amount);
+        totalDepositedTSP = totalDepositedTSP.add(_amount);
 
-        depositors[msg.sender].debtRewards = depositors[msg.sender].amount.mul(shareAcc).div(1e12);
+        delegators[msg.sender].debtRewards = delegators[msg.sender].tspAmount.mul(shareAcc).div(1e12);
 
-        emit Deposit(msg.sender, _amount);
+        emit DepositTSP(msg.sender, _amount);
     }
 
-    // Only minter can call this method
     function withdraw(uint256 _amount) 
         public
-        onlyDepositor
+        onlyDelegator
     {
         if (_amount == 0) return;
 
-        if (delegators[delegator].amount == 0) return;
-        uint256 shareAcc = _getShareAcc();
-        uint256 pending = depositors[msg.sender].mul(shareAcc).div(1e12).sub(depositors[msg.sender].debtRewards);
+        if (delegators[delegator].tspAmount == 0) return;
+
+        _updateRewardInfo();
+
+        uint256 pending = delegators[msg.sender].tspAmount.mul(shareAcc).div(1e12).sub(delegators[delegator].debtRewards);
         if(pending > 0) {
-            depositors[msg.sender].availablePeanuts = depositors[msg.sender].availablePeanuts.add(pending);
+            delegators[delegator].availablePeanuts = delegators[delegator].availablePeanuts.add(pending);
         }
         
         uint256 withdrawAmount;
-        if (_amount >= depositors[msg.sender].amount)
-            withdrawAmount = depositors[msg.sender].amount;
+        if (_amount >= delegators[msg.sender].tspAmount)
+            withdrawAmount = delegators[msg.sender].tspAmount;
         else
             withdrawAmount = _amount;
 
-        depositors[msg.sender].amount = depositors[msg.sender].amount.sub(withdrawAmount);
-        // transfer tsp from this to depositor
-        TSP.transferFrom(this, msg.sender, withdrawAmount);
+        // transfer TSP from this to delegator
+        TSP.transfer(msg.sender, withdrawAmount);
+        delegators[msg.sender].tspAmount = delegators[msg.sender].tspAmount.sub(withdrawAmount);
+        totalDepositedTSP = totalDepositedTSP.sub(withdrawAmount);
 
-        depositors[msg.sender].debtRewards = depositors[msg.sender].amount.mul(shareAcc).div(1e12);
+        delegators[msg.sender].debtRewards = delegators[msg.sender].tspAmount.mul(shareAcc).div(1e12);
 
-        emit Withdraw(msg.sender, withdrawAmount);
+        emit WithdrawTSP(msg.sender, withdrawAmount);
     }
     
     function withdrawPeanuts() 
         public
-        onlyDepositor
+        onlyDelegator
     {
-        uint256 shareAcc = _getShareAcc();
-        uint256 pending = depositors[msg.sender].amount.mul(shareAcc).div(1e12).sub(depositors[msg.sender].debtRewards);
-        if(pending > 0) {
-            depositors[msg.sender].availablePeanuts = depositors[msg.sender].availablePeanuts.add(pending);
+        // game has not started
+        if (lastRewardBlock == 0) return;
+
+        // There are new blocks created after last updating, so append new rewards before withdraw
+        if(block.number > lastRewardBlock) {
+            _updateRewardInfo();
         }
 
-        Pnuts.transfer(msg.sender, depositors[msg.sender].availablePeanuts);
+        uint256 pending = delegators[msg.sender].tspAmount.mul(shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
+        if(pending > 0) {
+            delegators[msg.sender].availablePeanuts = delegators[msg.sender].availablePeanuts.add(pending);
+        }
 
-        depositors[msg.sender].debtRewards = depositors[msg.sender].amount.mul(shareAcc).div(1e12);
+        Pnuts.transfer(msg.sender, delegators[msg.sender].availablePeanuts);
 
-        emit WithdrawPeanuts(msg.sender, depositors[msg.sender].availablePeanuts);
+        delegators[msg.sender].debtRewards = delegators[msg.sender].tspAmount.mul(shareAcc).div(1e12);
 
-        depositors[msg.sender].availablePeanuts = 0;
+        emit WithdrawPeanuts(msg.sender, delegators[msg.sender].availablePeanuts);
+
+        delegators[msg.sender].availablePeanuts = 0;
+    }
+
+    // TODO: transfer peanuts to dev
+    function rewardToDev() public onlyOwner {
+
     }
     
     // pending peanuts >= delegator.availablePeanuts
     function getPendingPeanuts() public view returns (uint256) {
-        uint256 shareAcc = _getShareAcc();
-        uint256 pending = depositors[msg.sender].amount.mul(shareAcc).div(1e12).sub(depositors[msg.sender].debtRewards);
-        return depositors[msg.sender].availablePeanuts.add(pending);
+        // game has not started
+        if (lastRewardBlock == 0) return 0;
+
+        uint256 currentBlock = block.number;
+
+        // our lastRewardBlock isn't up to date, as the result, the availablePeanuts isn't
+        // the right amount that delegator can award
+        if (currentBlock > lastRewardBlock) {
+            uint256 _shareAcc = shareAcc;
+            uint256 unmintedPeanuts = _calculateReward();
+            _shareAcc = _shareAcc.add(unmintedPeanuts.mul(1e12).div(totalDepositedTSP));
+            uint256 pending = delegators[msg.sender].tspAmount.mul(_shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
+            return delegators[msg.sender].availablePeanuts.add(pending);
+        } else {
+            return delegators[msg.sender].availablePeanuts;
+        }
     }
 
-    function getDepositorListLength() public view returns(uint256){
-        return depositorsList.length;
+    function getTotalPendingPeanuts() public view returns (uint256) {
+        // game has not started
+        if (lastRewardBlock == 0) return 0;
+
+        uint256 currentBlock = block.number;
+        uint256 totalRewardPeanuts = Pnuts.balanceOf(address(this));
+
+        // our lastRewardBlock isn't up to date, as the result, the availablePeanuts isn't
+        // the right amount that delegator can award
+        if (currentBlock > lastRewardBlock) {
+            uint256 unmintedPeanuts = _calculateReward();
+            return totalRewardPeanuts.add(unmintedPeanuts).add(unmintedPeanuts.div(10));
+        } else {
+            return totalRewardPeanuts;
+        }
     }
 
-    function _getShareAcc() internal view returns (uint256) {
-        uint256 from = PnutPool.lastRewardBlock;
-        uint256 shareAcc = PnutPool.shareAcc;
-        uint256 totalDepositedSP = PnutPool.totalDepositedSP;
-        uint256 to = block.number;
+    function getDelegatorListLength() public view returns(uint256) {
+        return delegatorsList.length;
+    }
 
-        require(from <= to);
-
-        uint256 BASE_20  = 20 * 1e6;
-        uint256 BASE_10  = 10 * 1e6;
-        uint256 BASE_5  = 5 * 1e6;
-        uint256 BASE_2  = 25 * 1e5;
-        uint256 BASE_1  = 125 * 1e4;
-
+    function _updateRewardInfo() internal {
         uint256 peanutsReadyToMinted = 0;
 
-        if (to <= (genesisBlock + 1000000)) {
-            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_20);
-        } else if (from > (genesisBlock + 1000000) && to <= (genesisBlock + 10000000)) {
-            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_10);
-        } else if (from > (genesisBlock + 10000000) && to <= (genesisBlock + 20000000)) {
-            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_5);
-        } else if (from > (genesisBlock + 20000000) && to <= (genesisBlock + 30000000)) {
-            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_2);
-        } else if(from > (genesisBlock + 30000000)) {
-            peanutsReadyToMinted = to.sub(from).add(1).mul(BASE_1);
-        } else {    // reward maybe different under those blocks, so calculate it one by one
-            if (from <= (genesisBlock + 1000000) && to >= (genesisBlock + 1000000)) {
-                peanutsReadyToMinted = BASE_20.mul((genesisBlock + 1000000).sub(from).add(1)).add(BASE_10.mul(to.sub((genesisBlock + 1000000))));
-            } else if (from <= (genesisBlock + 10000000) && to >= (genesisBlock + 10000000)) {
-                peanutsReadyToMinted = BASE_10.mul((genesisBlock + 10000000).sub(from).add(1)).add(BASE_5.mul(to.sub((genesisBlock + 10000000))));
-            } else if (from <= (genesisBlock + 20000000) && to >= (genesisBlock + 20000000)) {
-                peanutsReadyToMinted = BASE_5.mul((genesisBlock + 20000000).sub(from).add(1)).add(BASE_2.mul(to.sub((genesisBlock + 20000000))));
-            } else {
-                peanutsReadyToMinted = BASE_2.mul((genesisBlock + 30000000).sub(from).add(1)).add(BASE_1.mul(to.sub((genesisBlock + 30000000))));
-            }
-        }
-        return shareAcc.add(peanutsReadyToMinted.mul(1e12).div(totalDepositedSP));
+        // calculate latest reward peanuts
+        peanutsReadyToMinted = _calculateReward();
+
+        PnutPool.withdrawPeanuts();
+
+        shareAcc = shareAcc.add(peanutsReadyToMinted.mul(1e12).div(totalDepositedTSP));
+    }
+
+    // TODO: should dynamic calculate rewards
+    // rewards belong to delegaters should be:
+    //     Peanuts.balanceOf(address(this)).mult(totalDelegatedTSP.div(Tsp.totalSupply()))
+    function _calculateReward() internal view returns (uint256) {
+        return PnutPool.getPendingPeanuts();
     }
 }
