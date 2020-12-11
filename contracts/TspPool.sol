@@ -46,8 +46,8 @@ contract TspPooling is Ownable {
     }
 
     constructor (address _punts, address _pnutPool, address _tsp) public {
-        Pnuts = PnutsToken(_punts);
-        Tsp = NutboxTsp(_tsp);
+        Pnuts = ERC20Token(_punts);
+        Tsp = ERC20Token(_tsp);
         PnutPool = PeanutsPool(_pnutPool);
 
         shareAcc = 0;
@@ -103,13 +103,13 @@ contract TspPooling is Ownable {
     {
         if (_amount == 0) return;
 
-        if (delegators[delegator].tspAmount == 0) return;
+        if (delegators[msg.sender].tspAmount == 0) return;
 
         _updateRewardInfo();
 
-        uint256 pending = delegators[msg.sender].tspAmount.mul(shareAcc).div(1e12).sub(delegators[delegator].debtRewards);
+        uint256 pending = delegators[msg.sender].tspAmount.mul(shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
         if(pending > 0) {
-            delegators[delegator].availablePeanuts = delegators[delegator].availablePeanuts.add(pending);
+            delegators[msg.sender].availablePeanuts = delegators[msg.sender].availablePeanuts.add(pending);
         }
         
         uint256 withdrawAmount;
@@ -119,7 +119,7 @@ contract TspPooling is Ownable {
             withdrawAmount = _amount;
 
         // transfer TSP from this to delegator
-        TSP.transfer(msg.sender, withdrawAmount);
+        Tsp.transfer(msg.sender, withdrawAmount);
         delegators[msg.sender].tspAmount = delegators[msg.sender].tspAmount.sub(withdrawAmount);
         totalDepositedTSP = totalDepositedTSP.sub(withdrawAmount);
 
