@@ -7,6 +7,7 @@ interface ERC20Token {
     function transfer(address _to, uint256 _value) external returns (bool);
     function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
+    function totalSupply() external view returns (uint256);
 }
 
 interface PeanutsPool {
@@ -19,7 +20,6 @@ contract TspPooling is Ownable {
 
     struct Delegator {
         uint256 tspAmount;          // deposted tsp
-        uint256 lptokenAmount;      // deposted tsp
         uint256 availablePeanuts;   // minted peanuts for user
         uint256 debtRewards;        // rewards debt 
         bool hasDeposited;          // set true when first time deposit
@@ -30,6 +30,7 @@ contract TspPooling is Ownable {
     uint256 public shareAcc;
     uint256 public totalDepositedTSP;
     address public pairAddress;
+    address public devAddress;
     uint256 public lastRewardBlock;
 
     ERC20Token Pnuts;
@@ -53,6 +54,15 @@ contract TspPooling is Ownable {
         shareAcc = 0;
         totalDepositedTSP = 0;
         lastRewardBlock = 0;
+    }
+
+    // should do this before game start
+    function setDevAddress(address dev) 
+        public
+        onlyOwner
+    {
+        require(dev != address(0), "Invalid dev address");
+        devAddress = dev;
     }
 
     function deposit(uint256 _amount)
@@ -153,11 +163,6 @@ contract TspPooling is Ownable {
 
         delegators[msg.sender].availablePeanuts = 0;
     }
-
-    // TODO: transfer peanuts to dev
-    function rewardToDev() public onlyOwner {
-
-    }
     
     // pending peanuts >= delegator.availablePeanuts
     function getPendingPeanuts() public view returns (uint256) {
@@ -170,7 +175,7 @@ contract TspPooling is Ownable {
         // the right amount that delegator can award
         if (currentBlock > lastRewardBlock) {
             uint256 _shareAcc = shareAcc;
-            uint256 unmintedPeanuts = _calculateReward();
+            uint256 unmintedPeanuts = _calculateRewardToDelegators();
             _shareAcc = _shareAcc.add(unmintedPeanuts.mul(1e12).div(totalDepositedTSP));
             uint256 pending = delegators[msg.sender].tspAmount.mul(_shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
             return delegators[msg.sender].availablePeanuts.add(pending);
@@ -179,42 +184,30 @@ contract TspPooling is Ownable {
         }
     }
 
-    function getTotalPendingPeanuts() public view returns (uint256) {
-        // game has not started
-        if (lastRewardBlock == 0) return 0;
-
-        uint256 currentBlock = block.number;
-        uint256 totalRewardPeanuts = Pnuts.balanceOf(address(this));
-
-        // our lastRewardBlock isn't up to date, as the result, the availablePeanuts isn't
-        // the right amount that delegator can award
-        if (currentBlock > lastRewardBlock) {
-            uint256 unmintedPeanuts = _calculateReward();
-            return totalRewardPeanuts.add(unmintedPeanuts).add(unmintedPeanuts.div(10));
-        } else {
-            return totalRewardPeanuts;
-        }
-    }
-
     function getDelegatorListLength() public view returns(uint256) {
         return delegatorsList.length;
     }
 
     function _updateRewardInfo() internal {
-        uint256 peanutsReadyToMinted = 0;
-
-        // calculate latest reward peanuts
-        peanutsReadyToMinted = _calculateReward();
+        uint256 peanutsMintedToDev = _calculateRewardToDev();
+        uint256 peanutsMintedToDelegators = _calculateRewardToDelegators();
 
         PnutPool.withdrawPeanuts();
 
-        shareAcc = shareAcc.add(peanutsReadyToMinted.mul(1e12).div(totalDepositedTSP));
+        // reward extra peanuts to dev
+        Tsp.transfer(devAddress, peanutsMintedToDev);
+
+        // rewards belong to delegators temporary saved in contract, need delegator withdraw it
+        shareAcc = shareAcc.add(peanutsMintedToDelegators.mul(1e12).div(totalDepositedTSP));
+
+        lastRewardBlock = block.number;
     }
 
-    // TODO: should dynamic calculate rewards
-    // rewards belong to delegaters should be:
-    //     Peanuts.balanceOf(address(this)).mult(totalDelegatedTSP.div(Tsp.totalSupply()))
-    function _calculateReward() internal view returns (uint256) {
-        return PnutPool.getPendingPeanuts();
+    function _calculateRewardToDelegators() internal view returns (uint256) {
+        return PnutPool.getPendingPeanuts().mul(totalDepositedTSP.div(Tsp.totalSupply()));
+    }
+
+    function _calculateRewardToDev() internal view returns (uint256) {
+        return PnutPool.getPendingPeanuts().mul(Tsp.totalSupply().sub(totalDepositedTSP).div(Tsp.totalSupply()));
     }
 }
