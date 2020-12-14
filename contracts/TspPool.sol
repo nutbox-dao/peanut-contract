@@ -189,6 +189,18 @@ contract TspPooling is Ownable {
     }
 
     function _updateRewardInfo() internal {
+
+        // game has not started
+        if (lastRewardBlock == 0) return;
+
+        uint256 currentBlock = block.number;
+        
+        // make sure one block can only be calculated one time.
+        // think about this situation that more than one deposit/withdraw/withdrowPeanuts transactions 
+        // were exist in the same block, delegator.amout should be updated after _updateRewardInfo being 
+        // invoked and it's award peanuts should be calculated next time
+        if (currentBlock <= lastRewardBlock) return;
+
         uint256 peanutsMintedToDev = _calculateRewardToDev();
         uint256 peanutsMintedToDelegators = _calculateRewardToDelegators();
 
