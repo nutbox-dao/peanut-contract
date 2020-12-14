@@ -194,7 +194,7 @@ contract TspPooling is Ownable {
         if (lastRewardBlock == 0) return;
 
         uint256 currentBlock = block.number;
-        
+
         // make sure one block can only be calculated one time.
         // think about this situation that more than one deposit/withdraw/withdrowPeanuts transactions 
         // were exist in the same block, delegator.amout should be updated after _updateRewardInfo being 
@@ -207,7 +207,7 @@ contract TspPooling is Ownable {
         PnutPool.withdrawPeanuts();
 
         // reward extra peanuts to dev
-        Tsp.transfer(devAddress, peanutsMintedToDev);
+        Pnuts.transfer(devAddress, peanutsMintedToDev);
 
         // rewards belong to delegators temporary saved in contract, need delegator withdraw it
         shareAcc = shareAcc.add(peanutsMintedToDelegators.mul(1e12).div(totalDepositedTSP));
