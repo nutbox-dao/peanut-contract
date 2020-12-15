@@ -29,7 +29,6 @@ contract TspPooling is Ownable {
     address[] public delegatorsList;
     uint256 public shareAcc;
     uint256 public totalDepositedTSP;
-    address public pairAddress;
     address public devAddress;
     uint256 public lastRewardBlock;
 
