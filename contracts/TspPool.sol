@@ -69,9 +69,9 @@ contract TspPooling is Ownable {
     {
         if (_amount == 0) return;
 
-        // lastRewardBlock == 0 means there is not delegator exist. When first delegator come,
+        // totalDepositedTSP == 0 means there is not delegator exist. When first delegator come,
         // we set lastRewardBlock as current block number, then our game starts!
-        if (lastRewardBlock == 0) {
+        if (totalDepositedTSP == 0) {
             lastRewardBlock = block.number;
         }
 
@@ -203,13 +203,17 @@ contract TspPooling is Ownable {
         uint256 peanutsMintedToDev = _calculateRewardToDev();
         uint256 peanutsMintedToDelegators = _calculateRewardToDelegators();
 
+        // rewards belong to delegators temporary saved in contract, need delegator withdraw it
         PnutPool.withdrawPeanuts();
 
         // reward extra peanuts to dev
         Pnuts.transfer(devAddress, peanutsMintedToDev.div(1e12));
 
-        // rewards belong to delegators temporary saved in contract, need delegator withdraw it
-        shareAcc = shareAcc.add(peanutsMintedToDelegators.div(1e12).mul(1e12).div(totalDepositedTSP));
+        if (totalDepositedTSP == 0) {   // if no one have delegated sor far, reset shareAcc
+            shareAcc = 0;
+        } else {
+            shareAcc = shareAcc.add(peanutsMintedToDelegators.div(1e12).mul(1e12).div(totalDepositedTSP));
+        }
 
         lastRewardBlock = block.number;
     }
