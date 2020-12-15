@@ -71,7 +71,10 @@ contract TspPooling is Ownable {
 
         // totalDepositedTSP == 0 means there is not delegator exist. When first delegator come,
         // we set lastRewardBlock as current block number, then our game starts!
+        // and reward before this moment shoud be sent to dev
         if (totalDepositedTSP == 0) {
+            PnutPool.withdrawPeanuts();
+            Pnuts.transfer(devAddress, Pnuts.balanceOf(address(this)));
             lastRewardBlock = block.number;
         }
 
@@ -132,6 +135,10 @@ contract TspPooling is Ownable {
         delegators[msg.sender].tspAmount = delegators[msg.sender].tspAmount.sub(withdrawAmount);
         totalDepositedTSP = totalDepositedTSP.sub(withdrawAmount);
 
+        // now game stopped, reset contract status
+        if (totalDepositedTSP == 0)
+            _resetStatus();
+
         delegators[msg.sender].debtRewards = delegators[msg.sender].tspAmount.mul(shareAcc).div(1e12);
 
         emit WithdrawTSP(msg.sender, withdrawAmount);
@@ -187,10 +194,16 @@ contract TspPooling is Ownable {
         return delegatorsList.length;
     }
 
+    function _resetStatus() internal {
+        shareAcc = 0;
+    }
+
     function _updateRewardInfo() internal {
 
         // game has not started
         if (lastRewardBlock == 0) return;
+
+        if (totalDepositedTSP == 0) _resetStatus();
 
         uint256 currentBlock = block.number;
 
@@ -209,8 +222,9 @@ contract TspPooling is Ownable {
         // reward extra peanuts to dev
         Pnuts.transfer(devAddress, peanutsMintedToDev.div(1e12));
 
-        if (totalDepositedTSP == 0) {   // if no one have delegated sor far, reset shareAcc
-            shareAcc = 0;
+        // whenever game being stopped, reset shareAcc
+        if (totalDepositedTSP == 0) {
+            _resetStatus();
         } else {
             shareAcc = shareAcc.add(peanutsMintedToDelegators.div(1e12).mul(1e12).div(totalDepositedTSP));
         }
