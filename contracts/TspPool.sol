@@ -176,7 +176,7 @@ contract TspPooling is Ownable {
         if (currentBlock > lastRewardBlock) {
             uint256 _shareAcc = shareAcc;
             uint256 unmintedPeanuts = _calculateRewardToDelegators();
-            _shareAcc = _shareAcc.add(unmintedPeanuts.mul(1e12).div(totalDepositedTSP));
+            _shareAcc = _shareAcc.add(unmintedPeanuts.div(1e12).mul(1e12).div(totalDepositedTSP));
             uint256 pending = delegators[msg.sender].tspAmount.mul(_shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
             return delegators[msg.sender].availablePeanuts.add(pending);
         } else {
@@ -207,19 +207,21 @@ contract TspPooling is Ownable {
         PnutPool.withdrawPeanuts();
 
         // reward extra peanuts to dev
-        Pnuts.transfer(devAddress, peanutsMintedToDev);
+        Pnuts.transfer(devAddress, peanutsMintedToDev.div(1e12));
 
         // rewards belong to delegators temporary saved in contract, need delegator withdraw it
-        shareAcc = shareAcc.add(peanutsMintedToDelegators.mul(1e12).div(totalDepositedTSP));
+        shareAcc = shareAcc.add(peanutsMintedToDelegators.div(1e12).mul(1e12).div(totalDepositedTSP));
 
         lastRewardBlock = block.number;
     }
 
+    // return  (amount of peanuts)*1e12
     function _calculateRewardToDelegators() internal view returns (uint256) {
-        return PnutPool.getPendingPeanuts().mul(totalDepositedTSP.div(Tsp.totalSupply()));
+        return PnutPool.getPendingPeanuts().mul(totalDepositedTSP.mul(1e12).div(Tsp.totalSupply()));
     }
 
+    // return (amount of peanuts)*1e12
     function _calculateRewardToDev() internal view returns (uint256) {
-        return PnutPool.getPendingPeanuts().mul(Tsp.totalSupply().sub(totalDepositedTSP).div(Tsp.totalSupply()));
+        return PnutPool.getPendingPeanuts().mul(Tsp.totalSupply().sub(totalDepositedTSP).mul(1e12).div(Tsp.totalSupply()));
     }
 }
