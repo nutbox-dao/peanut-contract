@@ -143,13 +143,19 @@ contract TspLPPooling is Ownable {
         public
         onlyDelegator
     {
-        uint256 _shareAcc = _calculateCurrentAcc();
+         uint256 _shareAcc = _calculateCurrentAcc();
 
         uint256 pending = delegators[msg.sender].tspLPAmount.mul(_shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
         if (pending > 0)
             delegators[msg.sender].availablePeanuts = delegators[msg.sender].availablePeanuts.add(pending);
+
+        uint256 balanceOfPnut = Pnuts.balanceOf(address(this));
+
+        if (delegators[msg.sender].availablePeanuts > balanceOfPnut){
+            emit NotEnoughBlanceOfPnut();
+        }
         
-        require(delegators[msg.sender].availablePeanuts <= Pnuts.balanceOf(address(this)), "ERC20: transfer amount exceeds balance");
+        require(delegators[msg.sender].availablePeanuts <= balanceOfPnut), "ERC20: transfer amount exceeds balance");
         Pnuts.transfer(msg.sender, delegators[msg.sender].availablePeanuts);
         delegators[msg.sender].debtRewards = delegators[msg.sender].tspLPAmount.mul(_shareAcc).div(1e12);
         delegators[msg.sender].availablePeanuts = 0;
