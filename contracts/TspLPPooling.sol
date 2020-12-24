@@ -55,6 +55,7 @@ contract TspLPPooling is Ownable {
     event WithdrawTSP(address delegator, uint256 amount);
     event WithdrawPeanuts(address delegator, uint256 amount);
     event UpdateData(uint256 vestsToSP);
+    event InsufficientBalance();
 
     constructor (address _pnuts, address _pnutPool, address _tsp, address _tsplp, address _LPAddress, uint256 _tspToVests) public {
         Pnuts = ERC20Token(_pnuts);
@@ -152,7 +153,7 @@ contract TspLPPooling is Ownable {
         uint256 balanceOfPnut = Pnuts.balanceOf(address(this));
 
         if (delegators[msg.sender].availablePeanuts > balanceOfPnut){
-            emit NotEnoughBlanceOfPnut();
+            emit InsufficientBalance();
         }
         
         require(delegators[msg.sender].availablePeanuts <= balanceOfPnut, "ERC20: transfer amount exceeds balance");
