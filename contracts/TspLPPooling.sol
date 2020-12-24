@@ -76,7 +76,6 @@ contract TspLPPooling is Ownable {
 
     function deposit(uint256 _amount)
         public
-        onlyDelegator
     {
         if (_amount == 0) return;
 
