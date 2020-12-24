@@ -155,7 +155,7 @@ contract TspLPPooling is Ownable {
             emit NotEnoughBlanceOfPnut();
         }
         
-        require(delegators[msg.sender].availablePeanuts <= balanceOfPnut), "ERC20: transfer amount exceeds balance");
+        require(delegators[msg.sender].availablePeanuts <= balanceOfPnut, "ERC20: transfer amount exceeds balance");
         Pnuts.transfer(msg.sender, delegators[msg.sender].availablePeanuts);
         delegators[msg.sender].debtRewards = delegators[msg.sender].tspLPAmount.mul(_shareAcc).div(1e12);
         delegators[msg.sender].availablePeanuts = 0;
