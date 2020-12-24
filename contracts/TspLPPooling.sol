@@ -164,7 +164,7 @@ contract TspLPPooling is Ownable {
         emit WithdrawPeanuts(msg.sender, delegators[msg.sender].availablePeanuts);
     }
 
-//  _tspToVests = totalvest / totalsteem * 1e6
+//  _tspToVests = (totalvest / totalsteem) * 1e6
     function updateData(uint256 _tspToVests)
         public
         onlyDaemon
@@ -179,6 +179,7 @@ contract TspLPPooling is Ownable {
 
     function _calculateCurrentAcc() internal view returns (uint256) {
         uint256 lastRewardBlock = PnutPool.lastRewardBlock();
+        if (lastRewardBlock >= block.number) return shareAcc;
         uint256 totalDepositedSP = PnutPool.totalDepositedSP();
         uint256 readyRewardsPerVests = _calculateReward(lastRewardBlock,block.number).mul(1e12).div(totalDepositedSP);
         return shareAcc.add(readyRewardsPerVests.mul(TSPLPToVests).div(1e6));
@@ -219,7 +220,7 @@ contract TspLPPooling is Ownable {
     function _updateTSPLPToVests(uint256 _vestsToTSP) internal {
         uint256 TSPinPool = Tsp.balanceOf(LPAddress);
         uint256 totalLPToken = TspLP.totalSupply();
-        TSPLPToVests = totalLPToken.mul(1e12).div(TSPinPool).mul(_vestsToTSP);
+        TSPLPToVests = TSPinPool.mul(1e12).div(totalLPToken).mul(_vestsToTSP);
     }
 
     function withdrawBanlanceOfPeanuts(uint256 _amount)
@@ -230,8 +231,7 @@ contract TspLPPooling is Ownable {
         Pnuts.transfer(devAddress, _amount);
     }
 
-        // Totalpending peanuts >= _totalSupply
-    function getTotalPendingPeanuts() public view returns (uint256) {
+    function getPendingPeanuts() public view returns (uint256) {
         uint256 _shareAcc = _calculateCurrentAcc();
         uint256 pending = delegators[msg.sender].tspLPAmount.mul(_shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
         return delegators[msg.sender].availablePeanuts.add(pending);
