@@ -30,7 +30,8 @@ contract TspLPPooling is Ownable {
     uint256 public shareAcc;                        // reward peanuts per TSPLP * 1e12
     uint256 public totalDepositedTSPLP;
     uint256 public TSPLPToVests;                    // TSP-LP to vests * 1e12
-    uint256 public genesisBlock;                    
+    uint256 public genesisBlock;             
+    uint256 public lastRewardBlock;       
     address public daemonAddress;
     address public devAddress;                      // send balance peanuts to this devAddress
     address public LPAddress;                       // address of TRX-TSP pool    
@@ -67,11 +68,11 @@ contract TspLPPooling is Ownable {
         shareAcc = 0;
         totalDepositedTSPLP = 0;
         genesisBlock = PnutPool.genesisBlock();
+        lastRewardBlock = block.number;
 
-//      set shareAcc first time
+//      set TSPLPToVests first time
         _updateTSPLPToVests(_tspToVests);
-        shareAcc = _calculateCurrentAcc();
-
+        shareAcc = 0;
     }
 
     function deposit(uint256 _amount)
@@ -172,16 +173,16 @@ contract TspLPPooling is Ownable {
         shareAcc = _calculateCurrentAcc();
 
         _updateTSPLPToVests(_tspToVests);
+        lastRewardBlock = block.number;
 
         emit UpdateData(_tspToVests);
     }
 
     function _calculateCurrentAcc() internal view returns (uint256) {
-        uint256 lastRewardBlock = PnutPool.lastRewardBlock();
         if (lastRewardBlock >= block.number) return shareAcc;
         uint256 totalDepositedSP = PnutPool.totalDepositedSP();
         uint256 readyRewardsPerVests = _calculateReward(lastRewardBlock,block.number).mul(1e12).div(totalDepositedSP);
-        return shareAcc.add(readyRewardsPerVests.mul(TSPLPToVests).div(1e6));
+        return shareAcc.add(readyRewardsPerVests.mul(TSPLPToVests).div(1e18));
     }
 
     // calculate reward between blocks [from, to]
