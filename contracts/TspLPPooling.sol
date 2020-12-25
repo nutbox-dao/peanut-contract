@@ -12,7 +12,6 @@ interface ERC20Token {
 
 interface PeanutsPool {
     function genesisBlock() external view returns (uint256);
-    function lastRewardBlock() external view returns (uint256);
     function totalDepositedSP() external view returns (uint256);
 }
 
