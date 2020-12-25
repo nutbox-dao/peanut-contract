@@ -91,6 +91,7 @@ contract TspLPPooling is Ownable {
             delegators[msg.sender].availablePeanuts = 0;
             delegators[msg.sender].debtRewards = _amount.mul(_shareAcc).div(1e12);
             delegators[msg.sender].tspLPAmount = _amount;
+            totalDepositedTSPLP = totalDepositedTSPLP + _amount;
             delegatorsList.push(msg.sender);
             return;
         }
@@ -136,7 +137,6 @@ contract TspLPPooling is Ownable {
 
 
         emit WithdrawTSP(msg.sender, _amount);
-
     }
 
     function withdrawPeanuts()
@@ -237,7 +237,7 @@ contract TspLPPooling is Ownable {
     }
 
        // return TSP-LP as unit
-    function getTotalDepositedSP() public view returns (uint256) {
+    function getTotalDepositedTSPLP() public view returns (uint256) {
         return totalDepositedTSPLP;
     }
 
