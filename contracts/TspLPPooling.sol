@@ -135,6 +135,15 @@ contract TspLPPooling is Ownable {
         totalDepositedTSPLP = totalDepositedTSPLP.sub(withdrawAmount);
         delegators[msg.sender].debtRewards = delegators[msg.sender].tspLPAmount.mul(_shareAcc).div(1e12);
 
+//      withdraw peanuts when cancel delegate
+        if (delegators[msg.sender].tspLPAmount == 0 && delegators[msg.sender].availablePeanuts > 0){
+            // do not withdraw peanuts if contract insufficentBalance
+            if (delegators[msg.sender].availablePeanuts > Pnuts.balanceOf(address(this))){
+                emit InsufficientBalance();
+            }else{
+                Pnuts.transfer(msg.sender, delegtors[msg.sender].availablePeanuts);
+            }
+        }
 
         emit WithdrawTSP(msg.sender, _amount);
     }
@@ -151,8 +160,9 @@ contract TspLPPooling is Ownable {
 
         uint256 balanceOfPnut = Pnuts.balanceOf(address(this));
 
-        if (delegators[msg.sender].availablePeanuts > balanceOfPnut){
+        if (delegators[msg.sender].availablePeanuts >= balanceOfPnut){
             emit InsufficientBalance();
+            return;
         }
         
         require(delegators[msg.sender].availablePeanuts <= balanceOfPnut, "ERC20: transfer amount exceeds balance");
@@ -260,6 +270,11 @@ contract TspLPPooling is Ownable {
     {
         require(dev != address(0), "Invalid dev address");
         devAddress = dev;
+    }
+
+    function getBalanceOfPeanuts() public view onlyOwner returns(uint256)
+    {
+        return Pnuts.balanceOf(address(this)); 
     }
 
 }
