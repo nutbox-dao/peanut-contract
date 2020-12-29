@@ -15,7 +15,7 @@ interface PeanutsPool {
     function totalDepositedSP() external view returns (uint256);
 }
 
-contract TspLPPool is Ownable {
+contract TspLpPool is Ownable {
     using SafeMath for uint256;
     struct Delegator {
         uint256 tspLPAmount;             // TSP-LP token
