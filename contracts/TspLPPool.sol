@@ -15,7 +15,7 @@ interface PeanutsPool {
     function totalDepositedSP() external view returns (uint256);
 }
 
-contract TspLPPooling is Ownable {
+contract TspLPPool is Ownable {
     using SafeMath for uint256;
     struct Delegator {
         uint256 tspLPAmount;             // TSP-LP token
@@ -175,11 +175,11 @@ contract TspLPPooling is Ownable {
     }
 
 //  _tspToVests = (totalvest / totalsteem) * 1e6
-    function updateData(uint256 _tspToVests)
+    function updateDataBy(uint256 _tspToVests)
         public
         onlyDaemon
     {
-        // cul acc use the old vestsToTSPlP,then update vestsTSPLP
+        // cul acc use the old vestsToTSPlP,then update vestsToTSPLP
         shareAcc = _calculateCurrentAcc();
 
         _updateTSPLPToVests(_tspToVests);
