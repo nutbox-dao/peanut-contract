@@ -168,7 +168,7 @@ contract PnutLpPool is Ownable {
 
         // our lastRewardBlock isn't up to date, as the result, the availablePeanuts isn't
         // the right amount that delegator can award
-        if (currentBlock > lastRewardBlock) {
+        if (currentBlock > lastRewardBlock && totalDepositedPnutLp != 0) {
             uint256 _shareAcc = shareAcc;
             uint256 unmintedPeanuts = _calculateReward();
             _shareAcc = _shareAcc.add(unmintedPeanuts.mul(1e12).div(totalDepositedPnutLp));
@@ -191,7 +191,11 @@ contract PnutLpPool is Ownable {
         uint256 unmintedPeanuts = _calculateReward();
 
         // whenever game being stopped, reset shareAcc
-        shareAcc = shareAcc.add(unmintedPeanuts.mul(1e12).div(totalDepositedPnutLp));
+        if (totalDepositedPnutLp == 0){
+            shareAcc = shareAcc.add(unmintedPeanuts.mul(1e12).div(1));
+        }else{
+            shareAcc = shareAcc.add(unmintedPeanuts.mul(1e12).div(totalDepositedPnutLp));
+        }
 
         lastRewardBlock = block.number;
     }
