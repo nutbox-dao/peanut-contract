@@ -131,6 +131,13 @@ contract PnutLpPool is Ownable {
         delegators[msg.sender].debtRewards = delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12);
 
         emit Withdraw(msg.sender, withdrawAmount);
+
+        // if canceled , withdrawpeanut
+        if(delegators[msg.sender].pnutLpAmount == 0 && delegators[msg.sender].availablePeanuts != 0) {
+            Pnuts.transfer(msg.sender, delegators[msg.sender].availablePeanuts);
+            delegators[msg.sender].availablePeanuts = 0;
+            emit WithdrawPeanuts(msg.sender, delegators[msg.sender].availablePeanuts);
+        }
     }
     
     function withdrawPeanuts() 
