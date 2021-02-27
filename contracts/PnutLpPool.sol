@@ -23,7 +23,6 @@ contract PnutLpPool is Ownable {
     address[] public delegatorsList;
     uint256 public shareAcc;
     uint256 public totalDepositedPnutLp;
-    address public devAddress;
     uint256 public lastRewardBlock;
     uint256 public rewardPerBlock;          // params1:reward per block
     uint256 public endRewardBlock;        // params2:reward pnut before this block
@@ -49,15 +48,6 @@ contract PnutLpPool is Ownable {
         lastRewardBlock = 0;
         rewardPerBlock = 200000;
         endRewardBlock = block.number.add(10000000);
-    }
-
-    // should do this before game start
-    function setDevAddress(address dev) 
-        public
-        onlyOwner
-    {
-        require(dev != address(0), "Invalid dev address");
-        devAddress = dev;
     }
 
     function deposit(uint256 _amount)
@@ -228,17 +218,5 @@ contract PnutLpPool is Ownable {
         _updateRewardInfo();
         rewardPerBlock = _rewardPerBlock;
         endRewardBlock = block.number.add(_totalRewardBlock);
-    }
-
-    function withdrawBalanceToDev(uint256 _amount) 
-        public
-        onlyOwner
-    {
-        uint256 balance = Pnuts.balanceOf(address(this));
-        if (balance > _amount){
-            Pnuts.transfer(devAddress, _amount);
-        }else{
-            Pnuts.transfer(devAddress, balance);
-        }
     }
 }
