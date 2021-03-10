@@ -5,7 +5,13 @@ import "./Ownable.sol";
 
 interface ERC20Token {
     function transfer(address _to, uint256 _value) external returns (bool);
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+
+    function transferFrom(
+        address sender,
+        address recipient,
+        uint256 amount
+    ) external returns (bool);
+
     function balanceOf(address account) external view returns (uint256);
 }
 
@@ -13,10 +19,10 @@ contract PnutLpPool is Ownable {
     using SafeMath for uint256;
 
     struct Delegator {
-        uint256 pnutLpAmount;          // deposted pnutLp
-        uint256 availablePeanuts;   // minted peanuts for user
-        uint256 debtRewards;        // rewards debt 
-        bool hasDeposited;          // set true when first time deposit
+        uint256 pnutLpAmount; // deposted pnutLp
+        uint256 availablePeanuts; // minted peanuts for user
+        uint256 debtRewards; // rewards debt
+        bool hasDeposited; // set true when first time deposit
     }
 
     mapping(address => Delegator) public delegators;
@@ -24,8 +30,8 @@ contract PnutLpPool is Ownable {
     uint256 public shareAcc;
     uint256 public totalDepositedPnutLp;
     uint256 public lastRewardBlock;
-    uint256 public rewardPerBlock;          // params1:reward per block
-    uint256 public endRewardBlock;        // params2:reward pnut before this block
+    uint256 public rewardPerBlock; // params1:reward per block
+    uint256 public endRewardBlock; // params2:reward pnut before this block
 
     ERC20Token Pnuts;
     ERC20Token PnutLp;
@@ -35,11 +41,14 @@ contract PnutLpPool is Ownable {
     event WithdrawPeanuts(address delegator, uint256 amount);
 
     modifier onlyDelegator() {
-        require(delegators[msg.sender].hasDeposited, "Account is not a delegator");
+        require(
+            delegators[msg.sender].hasDeposited,
+            "Account is not a delegator"
+        );
         _;
     }
 
-    constructor (address _punts, address _pnutLp) public {
+    constructor(address _punts, address _pnutLp) public {
         Pnuts = ERC20Token(_punts);
         PnutLp = ERC20Token(_pnutLp);
 
@@ -50,9 +59,7 @@ contract PnutLpPool is Ownable {
         endRewardBlock = block.number.add(10000000);
     }
 
-    function deposit(uint256 _amount)
-        public
-    {
+    function deposit(uint256 _amount) public {
         if (_amount == 0) return;
 
         // lastRewardBlock == 0 means there is not delegator exist. When first delegator come,
@@ -62,12 +69,15 @@ contract PnutLpPool is Ownable {
         }
 
         uint256 pnutLpBalance = PnutLp.balanceOf(msg.sender);
-        require(_amount <= pnutLpBalance, "ERC20: transfer amount exceeds balance");
+        require(
+            _amount <= pnutLpBalance,
+            "ERC20: transfer amount exceeds balance"
+        );
 
         PnutLp.transferFrom(msg.sender, address(this), _amount);
 
         // Add to delegator list if account hasn't deposited before
-        if(!delegators[msg.sender].hasDeposited) {
+        if (!delegators[msg.sender].hasDeposited) {
             delegators[msg.sender].hasDeposited = true;
             delegators[msg.sender].availablePeanuts = 0;
             delegators[msg.sender].pnutLpAmount = 0;
@@ -78,77 +88,114 @@ contract PnutLpPool is Ownable {
         _updateRewardInfo();
 
         if (delegators[msg.sender].pnutLpAmount > 0) {
-            uint256 pending = delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
-            if(pending > 0) {
-                delegators[msg.sender].availablePeanuts = delegators[msg.sender].availablePeanuts.add(pending);
+            uint256 pending =
+                delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12).sub(
+                    delegators[msg.sender].debtRewards
+                );
+            if (pending > 0) {
+                delegators[msg.sender].availablePeanuts = delegators[msg.sender]
+                    .availablePeanuts
+                    .add(pending);
             }
         }
 
-        delegators[msg.sender].pnutLpAmount = delegators[msg.sender].pnutLpAmount.add(_amount);
+        delegators[msg.sender].pnutLpAmount = delegators[msg.sender]
+            .pnutLpAmount
+            .add(_amount);
         totalDepositedPnutLp = totalDepositedPnutLp.add(_amount);
 
-        delegators[msg.sender].debtRewards = delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12);
+        delegators[msg.sender].debtRewards = delegators[msg.sender]
+            .pnutLpAmount
+            .mul(shareAcc)
+            .div(1e12);
 
         emit Deposit(msg.sender, _amount);
     }
 
-    function withdraw(uint256 _amount) 
-        public
-        onlyDelegator
-    {
+    function withdraw(uint256 _amount) public onlyDelegator {
         if (_amount == 0) return;
 
         if (delegators[msg.sender].pnutLpAmount == 0) return;
 
         _updateRewardInfo();
 
-        uint256 pending = delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
-        if(pending > 0) {
-            delegators[msg.sender].availablePeanuts = delegators[msg.sender].availablePeanuts.add(pending);
+        uint256 pending =
+            delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12).sub(
+                delegators[msg.sender].debtRewards
+            );
+        if (pending > 0) {
+            delegators[msg.sender].availablePeanuts = delegators[msg.sender]
+                .availablePeanuts
+                .add(pending);
         }
-        
+
         uint256 withdrawAmount;
         if (_amount >= delegators[msg.sender].pnutLpAmount)
             withdrawAmount = delegators[msg.sender].pnutLpAmount;
-        else
-            withdrawAmount = _amount;
+        else withdrawAmount = _amount;
 
         // transfer Pnut-Lp from this to delegator
         PnutLp.transfer(msg.sender, withdrawAmount);
-        delegators[msg.sender].pnutLpAmount = delegators[msg.sender].pnutLpAmount.sub(withdrawAmount);
+        delegators[msg.sender].pnutLpAmount = delegators[msg.sender]
+            .pnutLpAmount
+            .sub(withdrawAmount);
         totalDepositedPnutLp = totalDepositedPnutLp.sub(withdrawAmount);
 
-        delegators[msg.sender].debtRewards = delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12);
+        delegators[msg.sender].debtRewards = delegators[msg.sender]
+            .pnutLpAmount
+            .mul(shareAcc)
+            .div(1e12);
 
         emit Withdraw(msg.sender, withdrawAmount);
+
+        // if canceled , withdrawpeanut
+        if (
+            delegators[msg.sender].pnutLpAmount == 0 &&
+            delegators[msg.sender].availablePeanuts != 0
+        ) {
+            Pnuts.transfer(msg.sender, delegators[msg.sender].availablePeanuts);
+            delegators[msg.sender].availablePeanuts = 0;
+            emit WithdrawPeanuts(
+                msg.sender,
+                delegators[msg.sender].availablePeanuts
+            );
+        }
     }
-    
-    function withdrawPeanuts() 
-        public
-        onlyDelegator
-    {
+
+    function withdrawPeanuts() public onlyDelegator {
         // game has not started
         if (lastRewardBlock == 0) return;
 
         // There are new blocks created after last updating, so append new rewards before withdraw
-        if(block.number > lastRewardBlock) {
+        if (block.number > lastRewardBlock) {
             _updateRewardInfo();
         }
 
-        uint256 pending = delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
-        if(pending > 0) {
-            delegators[msg.sender].availablePeanuts = delegators[msg.sender].availablePeanuts.add(pending);
+        uint256 pending =
+            delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12).sub(
+                delegators[msg.sender].debtRewards
+            );
+        if (pending > 0) {
+            delegators[msg.sender].availablePeanuts = delegators[msg.sender]
+                .availablePeanuts
+                .add(pending);
         }
 
         Pnuts.transfer(msg.sender, delegators[msg.sender].availablePeanuts);
 
-        delegators[msg.sender].debtRewards = delegators[msg.sender].pnutLpAmount.mul(shareAcc).div(1e12);
+        delegators[msg.sender].debtRewards = delegators[msg.sender]
+            .pnutLpAmount
+            .mul(shareAcc)
+            .div(1e12);
 
-        emit WithdrawPeanuts(msg.sender, delegators[msg.sender].availablePeanuts);
+        emit WithdrawPeanuts(
+            msg.sender,
+            delegators[msg.sender].availablePeanuts
+        );
 
         delegators[msg.sender].availablePeanuts = 0;
     }
-    
+
     // pending peanuts >= delegator.availablePeanuts
     function getPendingPeanuts() public view returns (uint256) {
         // game has not started
@@ -161,8 +208,15 @@ contract PnutLpPool is Ownable {
         if (currentBlock > lastRewardBlock && totalDepositedPnutLp != 0) {
             uint256 _shareAcc = shareAcc;
             uint256 unmintedPeanuts = _calculateReward();
-            _shareAcc = _shareAcc.add(unmintedPeanuts.mul(1e12).div(totalDepositedPnutLp));
-            uint256 pending = delegators[msg.sender].pnutLpAmount.mul(_shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
+            _shareAcc = _shareAcc.add(
+                unmintedPeanuts.mul(1e12).div(totalDepositedPnutLp)
+            );
+            uint256 pending =
+                delegators[msg.sender]
+                    .pnutLpAmount
+                    .mul(_shareAcc)
+                    .div(1e12)
+                    .sub(delegators[msg.sender].debtRewards);
             return delegators[msg.sender].availablePeanuts.add(pending);
         } else {
             return delegators[msg.sender].availablePeanuts;
@@ -170,7 +224,6 @@ contract PnutLpPool is Ownable {
     }
 
     function _updateRewardInfo() internal {
-
         // game has not started
         if (lastRewardBlock == 0) return;
 
@@ -181,36 +234,37 @@ contract PnutLpPool is Ownable {
         uint256 unmintedPeanuts = _calculateReward();
 
         // whenever game being stopped, reset shareAcc
-        if (totalDepositedPnutLp == 0){
+        if (totalDepositedPnutLp == 0) {
             shareAcc = shareAcc.add(unmintedPeanuts.mul(1e12).div(1));
-        }else{
-            shareAcc = shareAcc.add(unmintedPeanuts.mul(1e12).div(totalDepositedPnutLp));
+        } else {
+            shareAcc = shareAcc.add(
+                unmintedPeanuts.mul(1e12).div(totalDepositedPnutLp)
+            );
         }
 
         lastRewardBlock = block.number;
     }
 
-    function _calculateReward()  internal view returns (uint256) {
+    function _calculateReward() internal view returns (uint256) {
         uint256 currentBlock = block.number;
-        if(currentBlock <= lastRewardBlock)
-            return 0;
-        
-        if(lastRewardBlock < endRewardBlock){
-            if(currentBlock < endRewardBlock){
+        if (currentBlock <= lastRewardBlock) return 0;
+
+        if (lastRewardBlock < endRewardBlock) {
+            if (currentBlock < endRewardBlock) {
                 return rewardPerBlock.mul(currentBlock.sub(lastRewardBlock));
-            }else{
+            } else {
                 return rewardPerBlock.mul(endRewardBlock.sub(lastRewardBlock));
             }
-        }else{
+        } else {
             return 0;
         }
     }
 
-    function getDelegatorListLength() public view returns(uint256) {
+    function getDelegatorListLength() public view returns (uint256) {
         return delegatorsList.length;
     }
 
-    function updateParams(uint256 _rewardPerBlock, uint256 _totalRewardBlock) 
+    function updateParams(uint256 _rewardPerBlock, uint256 _totalRewardBlock)
         public
         onlyOwner
     {
