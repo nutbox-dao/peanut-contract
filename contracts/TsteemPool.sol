@@ -181,7 +181,7 @@ contract TsteemPool is Ownable {
         if (currentBlock > lastRewardBlock) {
             uint256 _shareAcc = shareAcc;
             uint256 unmintedPeanuts = _calculateRewardToDelegators();
-            _shareAcc = _shareAcc.add(unmintedPeanuts.div(totalDepositedTSTEEM));
+            _shareAcc = _shareAcc.add(unmintedPeanuts.div(1e12).mul(1e12).div(totalDepositedTSTEEM));
             uint256 pending = delegators[msg.sender].tsteemAmount.mul(_shareAcc).div(1e12).sub(delegators[msg.sender].debtRewards);
             return delegators[msg.sender].availablePeanuts.add(pending);
         } else {
@@ -225,7 +225,7 @@ contract TsteemPool is Ownable {
         if (totalDepositedTSTEEM == 0) {
             _resetStatus();
         } else {
-            shareAcc = shareAcc.add(peanutsMintedToDelegators.div(totalDepositedTSTEEM));
+            shareAcc = shareAcc.add(peanutsMintedToDelegators.div(1e12).mul(1e12).div(totalDepositedTSTEEM));
         }
 
         lastRewardBlock = block.number;
@@ -233,6 +233,7 @@ contract TsteemPool is Ownable {
 
     // return  (amount of peanuts)*1e12
     function _calculateRewardToDelegators() internal view returns (uint256) {
+        return PnutPool.getPendingPeanuts().mul(totalDepositedTSTEEM.mul(9e11).div(Tsteem.totalSupply()));
         return PnutPool.getPendingPeanuts().mul(9e11);
     }
 
