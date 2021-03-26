@@ -224,10 +224,7 @@ contract TsteemPool is Ownable {
         if (currentBlock > lastRewardBlock) {
             uint256 _shareAcc = shareAcc;
             uint256 totalPendingPnuts = _getTotalPendingPnut();
-            uint256 unmintedPeanuts =
-                totalPendingPnuts.mul(9e11).mul(totalDepositedTSTEEM).div(
-                    Tsteem.totalSupply()
-                );
+            uint256 unmintedPeanuts = totalPendingPnuts.mul(9e11);
             _shareAcc = _shareAcc.add(
                 unmintedPeanuts.div(1e12).mul(1e12).div(totalDepositedTSTEEM)
             );
@@ -265,12 +262,8 @@ contract TsteemPool is Ownable {
         // invoked and it's award peanuts should be calculated next time
         if (currentBlock <= lastRewardBlock) return;
         uint256 totalPendingPnuts = _getTotalPendingPnut();
-        uint256 peanutsMintedToDelegators =
-            totalPendingPnuts.mul(9e11).mul(totalDepositedTSTEEM).div(
-                Tsteem.totalSupply()
-            );
-        uint256 peanutsMintedToDev =
-            totalPendingPnuts.mul(1e12).sub(peanutsMintedToDelegators);
+        uint256 peanutsMintedToDelegators = totalPendingPnuts.mul(9e11);
+        uint256 peanutsMintedToDev = totalPendingPnuts.mul(1e11);
 
         // rewards belong to delegators temporary saved in contract, need delegator withdraw it
         PnutPool.withdrawPeanuts();
