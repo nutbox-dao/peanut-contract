@@ -55,12 +55,14 @@ contract TsteemPool is Ownable {
     constructor(
         address _punts,
         address _pnutPool,
-        address _tsteem
+        address _tsteem,
+        address _devAddress
     ) public {
         Pnuts = ERC20Token(_punts);
         Tsteem = ERC20Token(_tsteem);
         PnutPool = PeanutsPool(_pnutPool);
 
+        devAddress = _devAddress;
         shareAcc = 0;
         totalDepositedTSTEEM = 0;
         lastRewardBlock = 0;
