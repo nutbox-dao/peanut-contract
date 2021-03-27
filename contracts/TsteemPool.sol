@@ -13,8 +13,6 @@ interface ERC20Token {
     ) external returns (bool);
 
     function balanceOf(address account) external view returns (uint256);
-
-    function totalSupply() external view returns (uint256);
 }
 
 interface PeanutsPool {
